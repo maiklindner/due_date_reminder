@@ -30,12 +30,19 @@ class ReminderMailer < Mailer
 
 
   def self.find_issues
-    scope = Issue.open.scoped(:conditions => ["#{Issue.table_name}.assigned_to_id IS NOT NULL" +
-                                                  " AND #{Project.table_name}.status = #{Project::STATUS_ACTIVE}" +
-                                                  " AND #{Issue.table_name}.due_date IS NOT NULL" +
-                                                  " AND #{User.table_name}.status = #{User::STATUS_ACTIVE}"]
-    )
-    issues = scope.all(:include => [:status, :assigned_to, :project, :tracker])
+    conditions =  "#{Issue.table_name}.assigned_to_id IS NOT NULL" +
+                  " AND #{Project.table_name}.status = #{Project::STATUS_ACTIVE}" +
+                  " AND #{Issue.table_name}.due_date IS NOT NULL" +
+                  " AND #{User.table_name}.status = #{User::STATUS_ACTIVE}"
+
+    if Rails::VERSION::MAJOR >= 4
+      scope = Issue.open.where(conditions)
+      issues = scope.includes(:status, :assigned_to, :project, :tracker).to_a
+    else
+      scope = Issue.open.scoped(:conditions => [conditions])
+      issues = scope.all(:include => [:status, :assigned_to, :project, :tracker])
+    end
+
     issues.reject! { |issue| not (issue.remind? or issue.overdue?) }
     issues.sort! { |first, second| first.due_date <=> second.due_date }
   end
